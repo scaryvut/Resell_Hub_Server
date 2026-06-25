@@ -568,6 +568,51 @@ app.get("/users/email/:email", async (req, res) => {
   }
 });
 
+app.get(
+  "/buyer/dashboard/:email",
+  async (req, res) => {
+    try {
+      const email = req.params.email;
+
+      const orders = await ordersCollection
+        .find({
+          "buyerInfo.email": email,
+        })
+        .toArray();
+
+      const wishlist =
+        await wishlistCollection
+          .find({
+            userEmail: email,
+          })
+          .toArray();
+
+      res.send({
+        totalOrders: orders.length,
+        wishlist: wishlist.length,
+
+        delivered: orders.filter(
+          (o) =>
+            o.orderStatus ===
+            "delivered"
+        ).length,
+
+        pending: orders.filter(
+          (o) =>
+            o.orderStatus ===
+            "pending"
+        ).length,
+
+        recentOrders: orders.slice(0, 5),
+      });
+    } catch (error) {
+      res.status(500).send({
+        error: error.message,
+      });
+    }
+  }
+);
+
 
 
 //
