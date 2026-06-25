@@ -554,6 +554,20 @@ app.post("/payments", async (req, res) => {
   }
 });
 
+app.get("/users/email/:email", async (req, res) => {
+  try {
+    const result = await usersCollection.findOne({
+      email: req.params.email,
+    });
+
+    res.send(result || {});
+  } catch (error) {
+    res.status(500).send({
+      error: error.message,
+    });
+  }
+});
+
 
 
 //
