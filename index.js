@@ -66,6 +66,31 @@ app.get("/", (req, res) => {
   res.send("🚀 ResellHub Server Running");
 });
 
+app.post("/jwt", async (req, res) => {
+  try {
+    const user = req.body;
+
+    const token = jwt.sign(
+      {
+        email: user.email,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    res.send({
+      token,
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: error.message,
+    });
+  }
+});
+
 //
 // ================= USERS =================
 //
