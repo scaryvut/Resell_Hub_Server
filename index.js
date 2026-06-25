@@ -451,6 +451,25 @@ app.get("/admin/analytics", async (req, res) => {
   }
 });
 
+app.get(
+  "/payments/:email",
+  async (req, res) => {
+    const email = req.params.email;
+
+    const result =
+      await paymentsCollection
+        .find({
+          buyerEmail: email,
+        })
+        .sort({
+          paymentDate: -1,
+        })
+        .toArray();
+
+    res.send(result);
+  }
+);
+
 //
 // ================= START =================
 //
