@@ -4,14 +4,20 @@ const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
 require("dotenv").config();
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:3000"],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-const uri = process.env.MONGODB_URI;
+// ================= MONGODB =================
 
-const client = new MongoClient(uri, {
+const client = new MongoClient(process.env.MONGODB_URI, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
@@ -19,38 +25,225 @@ const client = new MongoClient(uri, {
   },
 });
 
-let productCollection;
+let db;
+let usersCollection;
+let productsCollection;
 let wishlistCollection;
-let orderCollection;
+let ordersCollection;
 
-async function run() {
-  await client.connect();
+async function connectDB() {
+  try {
+    await client.connect();
 
-  const db = client.db("ResellHub_db");
+    db = client.db("ResellHub_db");
 
-  productCollection = db.collection("products");
-  wishlistCollection = db.collection("wishlist");
-  orderCollection = db.collection("orders");
+    usersCollection = db.collection("users");
+    productsCollection = db.collection("products");
+    wishlistCollection = db.collection("wishlist");
+    ordersCollection = db.collection("orders");
 
-  console.log("MongoDB connected");
+    console.log("✅ MongoDB Connected");
+  } catch (error) {
+    console.error(error);
+  }
 }
 
-run();
+connectDB();
 
-// ---------------- PRODUCTS ----------------
+app.get("/", (req, res) => {
+  res.send("🚀 ResellHub Server Running");
+});
+
+//
+// ================= USERS =================
+//
+
+app.get("/users", async (req, res) => {
+  try {
+    const result = await usersCollection.find().toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.post("/users", async (req, res) => {
+  try {
+    const user = req.body;
+
+    const existingUser = await usersCollection.findOne({
+      email: user.email,
+    });
+
+    if (existingUser) {
+      return res.send({
+        message: "User already exists",
+      });
+    }
+
+    const result = await usersCollection.insertOne(user);
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.patch("/users/:id", async (req, res) => {
+  try {
+    const result = await usersCollection.updateOne(
+      {
+        _id: new ObjectId(req.params.id),
+      },
+      {
+        $set: req.body,
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/users/:id", async (req, res) => {
+  try {
+    const result = await usersCollection.deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+//
+// ================= PRODUCTS =================
+//
+
 app.get("/products", async (req, res) => {
-  const products = await productCollection.find().toArray();
-  res.send(products);
+  try {
+    const result = await productsCollection.find().toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
 });
 
 app.get("/products/:id", async (req, res) => {
-  const product = await productCollection.findOne({
-    _id: new ObjectId(req.params.id),
-  });
-  res.send(product);
+  try {
+    const result = await productsCollection.findOne({
+      _id: new ObjectId(req.params.id),
+    });
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
 });
 
-// ---------------- WISHLIST ----------------
+app.post("/products", async (req, res) => {
+  try {
+    const product = {
+      ...req.body,
+      status: "pending",
+      createdAt: new Date(),
+    };
+
+    const result = await productsCollection.insertOne(product);
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/seller-products/:email", async (req, res) => {
+  try {
+    const result = await productsCollection
+      .find({
+        "sellerInfo.email": req.params.email,
+      })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.patch("/products/:id", async (req, res) => {
+  try {
+    const result = await productsCollection.updateOne(
+      {
+        _id: new ObjectId(req.params.id),
+      },
+      {
+        $set: req.body,
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.delete("/products/:id", async (req, res) => {
+  try {
+    const result = await productsCollection.deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.patch("/admin/products/approve/:id", async (req, res) => {
+  try {
+    const result = await productsCollection.updateOne(
+      {
+        _id: new ObjectId(req.params.id),
+      },
+      {
+        $set: {
+          status: "approved",
+        },
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.patch("/admin/products/reject/:id", async (req, res) => {
+  try {
+    const result = await productsCollection.updateOne(
+      {
+        _id: new ObjectId(req.params.id),
+      },
+      {
+        $set: {
+          status: "rejected",
+        },
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+//
+// ================= WISHLIST =================
+//
+
 app.post("/wishlist", async (req, res) => {
   const result = await wishlistCollection.insertOne(req.body);
   res.send(result);
@@ -58,50 +251,210 @@ app.post("/wishlist", async (req, res) => {
 
 app.get("/wishlist/:email", async (req, res) => {
   const result = await wishlistCollection
-    .find({ userEmail: req.params.email })
+    .find({
+      userEmail: req.params.email,
+    })
     .toArray();
-  res.send(result);
-});
-
-app.delete("/wishlist/:id", async (req, res) => {
-  const id = req.params.id;
-
-  const result = await wishlistCollection.deleteOne({
-    _id: new ObjectId(id),
-  });
 
   res.send(result);
 });
 
 app.delete("/wishlist/:id", async (req, res) => {
-  const id = req.params.id;
-
   const result = await wishlistCollection.deleteOne({
-    _id: new ObjectId(id),
+    _id: new ObjectId(req.params.id),
   });
 
   res.send(result);
 });
 
-// ---------------- ORDERS ----------------
+//
+// ================= ORDERS =================
+//
+
 app.post("/orders", async (req, res) => {
-  const order = {
-    ...req.body,
-    status: "pending",
-    createdAt: new Date(),
-  };
+  try {
+    const order = {
+      ...req.body,
+      status: "pending",
+      createdAt: new Date(),
+    };
 
-  const result = await orderCollection.insertOne(order);
-  res.send(result);
+    const result = await ordersCollection.insertOne(order);
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/orders", async (req, res) => {
+  try {
+    const result = await ordersCollection
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
 });
 
 app.get("/orders/:email", async (req, res) => {
-  const result = await orderCollection
-    .find({ userEmail: req.params.email })
-    .toArray();
-  res.send(result);
+  try {
+    const result = await ordersCollection
+      .find({
+        userEmail: req.params.email,
+      })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
 });
 
+app.get("/seller-orders/:email", async (req, res) => {
+  try {
+    const result = await ordersCollection
+      .find({
+        "sellerInfo.email": req.params.email,
+      })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.patch("/orders/:id", async (req, res) => {
+  try {
+    const result = await ordersCollection.updateOne(
+      {
+        _id: new ObjectId(req.params.id),
+      },
+      {
+        $set: req.body,
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+//
+// ================= SELLER ANALYTICS =================
+//
+
+app.get("/seller/analytics/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+
+    const products = await productsCollection
+      .find({
+        "sellerInfo.email": email,
+      })
+      .toArray();
+
+    const orders = await ordersCollection
+      .find({
+        "sellerInfo.email": email,
+      })
+      .toArray();
+
+    const categoryMap = {};
+
+    products.forEach((item) => {
+      categoryMap[item.category] =
+        (categoryMap[item.category] || 0) + 1;
+    });
+
+    const categoryData = Object.entries(categoryMap).map(
+      ([name, value]) => ({
+        name,
+        value,
+      })
+    );
+
+    res.send({
+      totalProducts: products.length,
+      totalOrders: orders.length,
+      pendingOrders: orders.filter(
+        (o) => o.status === "pending"
+      ).length,
+      totalRevenue: orders.reduce(
+        (sum, order) =>
+          sum + Number(order.price || 0),
+        0
+      ),
+      categoryData,
+      orders,
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: error.message,
+    });
+  }
+});
+
+//
+// ================= ADMIN =================
+//
+
+app.get("/admin/stats", async (req, res) => {
+  try {
+    res.send({
+      totalUsers:
+        await usersCollection.countDocuments(),
+      totalProducts:
+        await productsCollection.countDocuments(),
+      totalOrders:
+        await ordersCollection.countDocuments(),
+    });
+  } catch (error) {
+    res.status(500).send({ error: error.message });
+  }
+});
+
+app.get("/admin/analytics", async (req, res) => {
+  try {
+    const categories =
+      await productsCollection
+        .aggregate([
+          {
+            $group: {
+              _id: "$category",
+              value: {
+                $sum: 1,
+              },
+            },
+          },
+        ])
+        .toArray();
+
+    res.send({
+      users:
+        await usersCollection.countDocuments(),
+      products:
+        await productsCollection.countDocuments(),
+      orders:
+        await ordersCollection.countDocuments(),
+      categories,
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: error.message,
+    });
+  }
+});
+
+//
+// ================= START =================
+//
+
 app.listen(port, () => {
-  console.log(`Server running on ${port}`);
+  console.log(`🚀 Server Running On Port ${port}`);
 });
