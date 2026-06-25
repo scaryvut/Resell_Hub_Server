@@ -13,6 +13,16 @@ app.use(
   })
 );
 
+const jwt = require("jsonwebtoken");
+const cookieParser =
+  require("cookie-parser");
+
+const verifyToken =
+  require("./middleware/verifyToken");
+
+const verifyAdmin =
+  require("./middleware/verifyAdmin");
+
 app.use(express.json());
 
 // ================= MONGODB =================
