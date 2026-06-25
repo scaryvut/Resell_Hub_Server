@@ -30,6 +30,7 @@ let usersCollection;
 let productsCollection;
 let wishlistCollection;
 let ordersCollection;
+let paymentsCollection;
 
 async function connectDB() {
   try {
@@ -41,6 +42,7 @@ async function connectDB() {
     productsCollection = db.collection("products");
     wishlistCollection = db.collection("wishlist");
     ordersCollection = db.collection("orders");
+    paymentsCollection = db.collection("payments");
 
     console.log("✅ MongoDB Connected");
   } catch (error) {
@@ -302,17 +304,26 @@ app.get("/orders", async (req, res) => {
 
 app.get("/orders/:email", async (req, res) => {
   try {
-    const result = await ordersCollection
-      .find({
-        userEmail: req.params.email,
-      })
-      .toArray();
+    const email = req.params.email;
+
+    const result =
+      await ordersCollection
+        .find({
+          "buyerInfo.email": email,
+        })
+        .sort({
+          createdAt: -1,
+        })
+        .toArray();
 
     res.send(result);
   } catch (error) {
-    res.status(500).send({ error: error.message });
+    res.status(500).send({
+      error: error.message,
+    });
   }
 });
+
 
 app.get("/seller-orders/:email", async (req, res) => {
   try {
