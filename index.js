@@ -44,7 +44,7 @@ let paymentsCollection;
 
 async function connectDB() {
   try {
-    await client.connect();
+    //await client.connect();
 
     db = client.db("ResellHub_db");
 
@@ -53,47 +53,6 @@ async function connectDB() {
     wishlistCollection = db.collection("wishlist");
     ordersCollection = db.collection("orders");
     paymentsCollection = db.collection("payments");
-
-    console.log("✅ MongoDB Connected");
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-connectDB();
-
-app.get("/", (req, res) => {
-  res.send("🚀 ResellHub Server Running");
-});
-
-app.post("/jwt", async (req, res) => {
-  try {
-    const user = req.body;
-
-    const token = jwt.sign(
-      {
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    res.send({
-      token,
-    });
-  } catch (error) {
-    res.status(500).send({
-      error: error.message,
-    });
-  }
-});
-
-//
-// ================= USERS =================
-//
 
 app.get("/users", async (req, res) => {
   try {
@@ -613,6 +572,47 @@ app.get(
   }
 );
 
+
+    console.log("✅ MongoDB Connected");
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+connectDB();
+
+app.get("/", (req, res) => {
+  res.send("🚀 ResellHub Server Running");
+});
+
+app.post("/jwt", async (req, res) => {
+  try {
+    const user = req.body;
+
+    const token = jwt.sign(
+      {
+        email: user.email,
+        role: user.role,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    res.send({
+      token,
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: error.message,
+    });
+  }
+});
+
+//
+// ================= USERS =================
+//
 
 
 //
