@@ -37,7 +37,7 @@ async function connectDB() {
 
     db = client.db("ResellHub_db");
 
-    usersCollection = db.collection("users");
+    usersCollection = db.collection("user");
     productsCollection = db.collection("products");
     wishlistCollection = db.collection("wishlist");
     ordersCollection = db.collection("orders");
@@ -469,6 +469,46 @@ app.get(
     res.send(result);
   }
 );
+
+app.post("/payments", async (req, res) => {
+  try {
+    const payment = req.body;
+
+    const existingPayment =
+      await paymentsCollection.findOne({
+        transactionId:
+          payment.transactionId,
+      });
+
+    if (existingPayment) {
+      return res.status(409).send({
+        success: false,
+        message:
+          "Payment already exists",
+      });
+    }
+
+    const result =
+      await paymentsCollection.insertOne(
+        payment
+      );
+
+    res.send({
+      success: true,
+      insertedId: result.insertedId,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send({
+      success: false,
+      message:
+        "Failed to save payment",
+    });
+  }
+});
+
+
 
 //
 // ================= START =================
