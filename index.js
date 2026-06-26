@@ -1,59 +1,114 @@
-const express = require("express");
-const cors = require("cors");
-const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
-require("dotenv").config();
+const express = require('express')
+const cors = require('cors');
+const app = express()
+const port = 5000
+require('dotenv').config();
 
-const app = express();
-const port = process.env.PORT || 5000;
-
-app.use(
-  cors({
-    origin: ["https://resell-hub-nine.vercel.app"],
-    credentials: true,
-  })
-);
-
-const jwt = require("jsonwebtoken");
-const cookieParser =
-  require("cookie-parser");
-
-const verifyToken =
-  require("./middleware/verifyToken");
-
-const verifyAdmin =
-  require("./middleware/verifyAdmin");
-
+app.use(cors());
 app.use(express.json());
 
-// ================= MONGODB =================
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
-const client = new MongoClient(process.env.MONGODB_URI, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
+app.get('/', (req, res) => {
+    res.send('Hello World!')
+})
+
+const logger = (req, res, next) => {
+    console.log('logger middleware logged', req.params);
+    next();
+}
+
+
+
+
+const uri = process.env.MONGODB_URI;
+
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
 });
 
-let db;
-let usersCollection;
-let productsCollection;
-let wishlistCollection;
-let ordersCollection;
-let paymentsCollection;
+async function run() {
+    try {
+        // Connect the client to the server	(optional starting in v4.7)
+        await client.connect();
 
-async function connectDB() {
-  try {
-    //await client.connect();
 
-    db = client.db("ResellHub_db");
+   const db = client.db("ResellHub_db");
 
-    usersCollection = db.collection("user");
-    productsCollection = db.collection("products");
-    wishlistCollection = db.collection("wishlist");
-    ordersCollection = db.collection("orders");
-    paymentsCollection = db.collection("payments");
+   const usersCollection = db.collection("user");
+   const productsCollection = db.collection("products");
+   const wishlistCollection = db.collection("wishlist");
+   const ordersCollection = db.collection("orders");
+   const paymentsCollection = db.collection("payments");
 
+
+        // verification related
+        const verifyToken = async (req, res, next) => {
+
+            const authHeader = req.headers?.authorization;
+            if (!authHeader) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+
+            const token = authHeader.split(' ')[1]
+
+            if (!token) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+
+            const query = { token: token }
+            const session = await sessionCollection.findOne(query);
+
+              if (!session) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+
+            const userId = session.userId;
+
+
+            const userQuery = {
+                _id: userId
+            }
+
+            const user = await usersCollection.findOne(userQuery);
+              if (!user) {
+                return res.status(401).send({ message: 'unauthorized access' })
+            }
+            // set data in the req object
+            req.user = user;
+            next();
+        }
+
+        // must be used after verifyToken middleware
+        const verifyBuyer = async (req, res, next) => {
+            if (req.user?.role !== 'buyer') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
+        // must be used after verifyToken middleware
+        const verifySeller = async (req, res, next) => {
+            if (req.user?.role !== 'seller') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
+        // must be used after verifyToken middleware
+        const verifyAdmin = async (req, res, next) => {
+            if (req.user.role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
+
+ //User      
 app.get("/users", async (req, res) => {
   try {
     const result = await usersCollection.find().toArray();
@@ -114,10 +169,7 @@ app.delete("/users/:id", async (req, res) => {
   }
 });
 
-//
-// ================= PRODUCTS =================
-//
-
+//Product
 app.get("/products", async (req, res) => {
   try {
     const result = await productsCollection.find().toArray();
@@ -236,10 +288,7 @@ app.patch("/admin/products/reject/:id", async (req, res) => {
   }
 });
 
-//
-// ================= WISHLIST =================
-//
-
+//wishlist
 app.post("/wishlist", async (req, res) => {
   const result = await wishlistCollection.insertOne(req.body);
   res.send(result);
@@ -263,10 +312,8 @@ app.delete("/wishlist/:id", async (req, res) => {
   res.send(result);
 });
 
-//
-// ================= ORDERS =================
-//
 
+//Orders
 app.post("/orders", async (req, res) => {
   try {
     const order = {
@@ -350,10 +397,7 @@ app.patch("/orders/:id", async (req, res) => {
   }
 });
 
-//
-// ================= SELLER ANALYTICS =================
-//
-
+//Seller Analytic
 app.get("/seller/analytics/:email", async (req, res) => {
   try {
     const email = req.params.email;
@@ -405,10 +449,8 @@ app.get("/seller/analytics/:email", async (req, res) => {
   }
 });
 
-//
-// ================= ADMIN =================
-//
 
+//Admin
 app.get("/admin/stats", async (req, res) => {
   try {
     res.send({
@@ -456,6 +498,7 @@ app.get("/admin/analytics", async (req, res) => {
   }
 });
 
+//Payment
 app.get(
   "/payments/:email",
   async (req, res) => {
@@ -511,114 +554,21 @@ app.post("/payments", async (req, res) => {
         "Failed to save payment",
     });
   }
-});
-
-app.get("/users/email/:email", async (req, res) => {
-  try {
-    const result = await usersCollection.findOne({
-      email: req.params.email,
-    });
-
-    res.send(result || {});
-  } catch (error) {
-    res.status(500).send({
-      error: error.message,
-    });
-  }
-});
-
-app.get(
-  "/buyer/dashboard/:email",
-  async (req, res) => {
-    try {
-      const email = req.params.email;
-
-      const orders = await ordersCollection
-        .find({
-          "buyerInfo.email": email,
-        })
-        .toArray();
-
-      const wishlist =
-        await wishlistCollection
-          .find({
-            userEmail: email,
-          })
-          .toArray();
-
-      res.send({
-        totalOrders: orders.length,
-        wishlist: wishlist.length,
-
-        delivered: orders.filter(
-          (o) =>
-            o.orderStatus ===
-            "delivered"
-        ).length,
-
-        pending: orders.filter(
-          (o) =>
-            o.orderStatus ===
-            "pending"
-        ).length,
-
-        recentOrders: orders.slice(0, 5),
-      });
-    } catch (error) {
-      res.status(500).send({
-        error: error.message,
-      });
+});    
+        // Send a ping to confirm a successful connection
+        await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Ensures that the client will close when you finish/error
+        // await client.close();
     }
-  }
-);
-
-
-    console.log("✅ MongoDB Connected");
-  } catch (error) {
-    console.error(error);
-  }
 }
-
-connectDB();
-
-app.get("/", (req, res) => {
-  res.send("🚀 ResellHub Server Running");
-});
-
-app.post("/jwt", async (req, res) => {
-  try {
-    const user = req.body;
-
-    const token = jwt.sign(
-      {
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
-
-    res.send({
-      token,
-    });
-  } catch (error) {
-    res.status(500).send({
-      error: error.message,
-    });
-  }
-});
-
-//
-// ================= USERS =================
-//
+run().catch(console.dir);
 
 
-//
-// ================= START ===============
-//
+
+
 
 app.listen(port, () => {
-  console.log(`🚀 Server Running On Port ${port}`);
-});
+    console.log(`Example app listening on port ${port}`)
+})
